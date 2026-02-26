@@ -1,10 +1,7 @@
-export function computeRisk(distanceKm, relativeVelocity) {
-  let score = 0;
-
-  if (distanceKm < 10) score += 25;
-  if (distanceKm < 5) score += 35;
-  if (distanceKm < 2) score += 50;
-  if (relativeVelocity > 2) score += 20;
-
-  return Math.min(score, 100);
+export function computeRiskScore(distanceKm) {
+  if (distanceKm < 1) return 95;
+  if (distanceKm < 5) return 75;
+  if (distanceKm < 10) return 50;
+  if (distanceKm < 50) return 20;
+  return 5;
 }
