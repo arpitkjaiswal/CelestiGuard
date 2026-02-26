@@ -1,30 +1,50 @@
 import express from "express";
 import cors from "cors";
-import { propagateSatellite, calculateDistance } from "./conjunctionEngine.js";
-import { computeRisk } from "./riskEngine.js";
+import * as satellite from "satellite.js";
+import { computeRiskScore } from "./riskEngine.js";
+import { simulateConjunction } from "./conjunctionEngine.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/analyze", (req, res) => {
+const PORT = 5000;
 
-  const tle1A = "1 25544U 98067A   24067.54834491  .00006489  00000+0  12563-3 0  9992";
-  const tle2A = "2 25544  51.6421 315.3676 0005504  78.6821  46.3653 15.50000000000000";
+// Sample TLE (ISS)
+const tleLine1 =
+  "1 25544U 98067A   24100.51083333  .00016717  00000+0  10270-3 0  9004";
+const tleLine2 =
+  "2 25544  51.6446  20.5797 0005447  23.4476  89.2583 15.49515389  9994";
 
-  const tle1B = "1 43013U 17073A   24067.54834491  .00001234  00000+0  00000+0 0  9991";
-  const tle2B = "2 43013  97.4321 200.1234 0012000 100.1234 200.5678 14.80000000000000";
+const satrec = satellite.twoline2satrec(tleLine1, tleLine2);
 
-  const posA = propagateSatellite(tle1A, tle2A);
-  const posB = propagateSatellite(tle1B, tle2B);
+app.get("/satellite", (req, res) => {
+  const now = new Date();
+  const positionAndVelocity = satellite.propagate(satrec, now);
 
-  const distance = calculateDistance(posA, posB);
-  const risk = computeRisk(distance, 3);
+  const gmst = satellite.gstime(now);
+  const positionEci = positionAndVelocity.position;
+
+  const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+
+  const lat = satellite.degreesLat(positionGd.latitude);
+  const lon = satellite.degreesLong(positionGd.longitude);
+  const height = positionGd.height;
+
+  res.json({ lat, lon, height });
+});
+
+app.get("/risk", (req, res) => {
+  const conjunctionData = simulateConjunction();
+  const risk = computeRiskScore(conjunctionData.distance);
 
   res.json({
-    distanceKm: distance,
-    riskScore: risk
+    distance: conjunctionData.distance,
+    riskScore: risk,
+    suggestedDeltaV: conjunctionData.deltaV
   });
 });
 
-app.listen(5000, () => console.log("CelestiGuard backend running on port 5000"));
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
